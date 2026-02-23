@@ -1,0 +1,492 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+    <title>全屏翻页时钟 · 稳定最大化</title>
+    <style>
+        /* ----- 彻底全屏 · 屏保风格 · 翻页时钟最大化 ----- */
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            user-select: none;
+        }
+
+        html, body {
+            width: 100%;
+            height: 100%;
+            overflow: hidden;
+        }
+
+        body {
+            background: radial-gradient(circle at 50% 40%, #0f1c1f, #030808);
+            font-family: 'Courier New', Courier, 'Roboto Mono', monospace;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 0;
+        }
+
+        /* 移除transition，彻底杜绝缩放时的过渡闪烁 */
+        .flip-clock {
+            display: flex;
+            flex-wrap: nowrap;
+            align-items: center;
+            justify-content: center;
+            width: auto;
+            height: auto;
+            background: #0e1a1c;
+            border-radius: 50px;
+            box-shadow: 0 20px 30px rgba(0,0,0,0.8), inset 0 0 15px rgba(255,215,100,0.25);
+            border: 1px solid #3e5a5e;
+            
+            /* ⚠️ 关键修复：移除transition，避免resize时闪烁 */
+            transition: none;
+        }
+
+        .flip-section {
+            display: flex;
+            gap: 0.15em;
+            position: relative;
+        }
+
+        .flip-section-divider {
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            font-size: 1.2em;
+            font-weight: 900;
+            color: #ffd978;
+            text-shadow: 0 0 20px #ffb86b, 0 0 8px #ffaa33;
+            margin: 0 0.1em;
+            letter-spacing: 0.1em;
+            animation: softPulse 1.8s infinite;
+            line-height: 0.8;
+        }
+
+        .flip-unit {
+            position: relative;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            width: 1.8em;
+            height: 2.4em;
+            background: transparent;
+        }
+
+        .static-card {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(145deg, #1e2b2e, #121c1e);
+            border-radius: 0.2em;
+            box-shadow: 
+                0 0.06em 0 #0a0f10,
+                inset 0 -0.04em 0.06em rgba(0,0,0,0.8),
+                inset 0 0.04em 0.05em rgba(220,240,255,0.1);
+            border: 0.01em solid #3e5a60;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            font-size: 2.2em;
+            font-weight: 800;
+            color: #f2efe2;
+            text-shadow: 0 0 0.15em #ffe2a4, 0 0 0.08em #ffc978;
+            line-height: 1;
+            font-family: 'Courier New', Courier, monospace;
+            backface-visibility: hidden;
+            z-index: 5;
+        }
+
+        .flip-animation-layer {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+            z-index: 15;
+            border-radius: 0.2em;
+            opacity: 0;
+            transform-origin: center bottom;
+            transform-style: preserve-3d;
+        }
+
+        .flip-animation-layer.flipping {
+            opacity: 1;
+            animation: flipCard 0.24s ease-in-out forwards;
+        }
+
+        .flip-outer {
+            width: 100%;
+            height: 100%;
+            position: relative;
+            border-radius: 0.2em;
+            background: transparent;
+        }
+
+        .flip-upper {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 50%;
+            background: linear-gradient(145deg, #1f2e31, #162124);
+            border-top-left-radius: 0.2em;
+            border-top-right-radius: 0.2em;
+            border-bottom: 0.02em solid #10191b;
+            box-shadow: inset 0 0.04em 0.06em rgba(0,0,0,0.6);
+            display: flex;
+            justify-content: center;
+            align-items: flex-end;
+            font-size: 1.6em;
+            font-weight: 800;
+            color: #f2efe2;
+            text-shadow: 0 0 0.12em #ffebb3;
+            line-height: 0.9;
+            padding-bottom: 0.1em;
+            box-sizing: border-box;
+            backface-visibility: hidden;
+            transform-origin: bottom;
+            transform: rotateX(0deg);
+            border-bottom: 0.01em solid #2d4247;
+        }
+
+        .flip-lower {
+            position: absolute;
+            bottom: 0;
+            left: 0;
+            width: 100%;
+            height: 50%;
+            background: linear-gradient(145deg, #1a272a, #121d1f);
+            border-bottom-left-radius: 0.2em;
+            border-bottom-right-radius: 0.2em;
+            border-top: 0.02em solid #091011;
+            box-shadow: inset 0 -0.04em 0.06em rgba(0,0,0,0.7);
+            display: flex;
+            justify-content: center;
+            align-items: flex-start;
+            font-size: 1.6em;
+            font-weight: 800;
+            color: #fefde9;
+            text-shadow: 0 0 0.12em #ffde9e;
+            line-height: 0.9;
+            padding-top: 0.1em;
+            backface-visibility: hidden;
+            transform-origin: top;
+            transform: rotateX(90deg);
+        }
+
+        @keyframes flipCard {
+            0% { transform: rotateX(0deg); }
+            30% { transform: rotateX(-15deg); }
+            70% { transform: rotateX(10deg); }
+            100% { transform: rotateX(0deg); }
+        }
+
+        .flip-animation-layer.flipping .flip-upper {
+            animation: upperFlip 0.24s ease-in forwards;
+        }
+        .flip-animation-layer.flipping .flip-lower {
+            animation: lowerFlip 0.24s ease-in forwards;
+        }
+
+        @keyframes upperFlip {
+            0% { transform: rotateX(0deg); }
+            100% { transform: rotateX(-90deg); }
+        }
+
+        @keyframes lowerFlip {
+            0% { transform: rotateX(90deg); }
+            100% { transform: rotateX(0deg); }
+        }
+
+        @keyframes softPulse {
+            0% { opacity: 0.95; text-shadow: 0 0 12px #ffc107, 0 0 25px #ffb86b; }
+            50% { opacity: 1; text-shadow: 0 0 25px #ffdfa0, 0 0 40px #ffb347; }
+            100% { opacity: 0.95; text-shadow: 0 0 12px #ffc107, 0 0 25px #ffb86b; }
+        }
+
+        .flip-label {
+            position: fixed;
+            bottom: 15px;
+            right: 30px;
+            color: rgba(170, 195, 199, 0.5);
+            font-size: 20px;
+            letter-spacing: 6px;
+            text-transform: uppercase;
+            font-weight: 300;
+            z-index: 100;
+            background: rgba(10, 20, 22, 0.3);
+            padding: 6px 18px;
+            border-radius: 40px;
+            backdrop-filter: blur(3px);
+            border: 1px solid rgba(255, 215, 100, 0.2);
+        }
+    </style>
+</head>
+<body>
+
+    <div class="flip-clock" id="flipClock">
+        <!-- 小时 -->
+        <div class="flip-section" id="hours-section">
+            <div class="flip-unit" id="hour-ten-unit">
+                <div class="static-card" id="hour-ten-static">0</div>
+                <div class="flip-animation-layer" id="hour-ten-flip">
+                    <div class="flip-outer">
+                        <div class="flip-upper" id="hour-ten-upper">0</div>
+                        <div class="flip-lower" id="hour-ten-lower">0</div>
+                    </div>
+                </div>
+            </div>
+            <div class="flip-unit" id="hour-unit-unit">
+                <div class="static-card" id="hour-one-static">0</div>
+                <div class="flip-animation-layer" id="hour-one-flip">
+                    <div class="flip-outer">
+                        <div class="flip-upper" id="hour-one-upper">0</div>
+                        <div class="flip-lower" id="hour-one-lower">0</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="flip-section-divider">
+            <span class="divider-dots">:</span>
+        </div>
+        <!-- 分钟 -->
+        <div class="flip-section" id="minutes-section">
+            <div class="flip-unit" id="min-ten-unit">
+                <div class="static-card" id="min-ten-static">0</div>
+                <div class="flip-animation-layer" id="min-ten-flip">
+                    <div class="flip-outer">
+                        <div class="flip-upper" id="min-ten-upper">0</div>
+                        <div class="flip-lower" id="min-ten-lower">0</div>
+                    </div>
+                </div>
+            </div>
+            <div class="flip-unit" id="min-unit-unit">
+                <div class="static-card" id="min-one-static">0</div>
+                <div class="flip-animation-layer" id="min-one-flip">
+                    <div class="flip-outer">
+                        <div class="flip-upper" id="min-one-upper">0</div>
+                        <div class="flip-lower" id="min-one-lower">0</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="flip-section-divider">
+            <span class="divider-dots">:</span>
+        </div>
+        <!-- 秒 -->
+        <div class="flip-section" id="seconds-section">
+            <div class="flip-unit" id="sec-ten-unit">
+                <div class="static-card" id="sec-ten-static">0</div>
+                <div class="flip-animation-layer" id="sec-ten-flip">
+                    <div class="flip-outer">
+                        <div class="flip-upper" id="sec-ten-upper">0</div>
+                        <div class="flip-lower" id="sec-ten-lower">0</div>
+                    </div>
+                </div>
+            </div>
+            <div class="flip-unit" id="sec-unit-unit">
+                <div class="static-card" id="sec-one-static">0</div>
+                <div class="flip-animation-layer" id="sec-one-flip">
+                    <div class="flip-outer">
+                        <div class="flip-upper" id="sec-one-upper">0</div>
+                        <div class="flip-lower" id="sec-one-lower">0</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="flip-label">◈ FLIP SCREENSAVER ◈</div>
+
+    <script>
+        (function() {
+            "use strict";
+
+            const flipClock = document.getElementById('flipClock');
+            
+            // 卡片元素绑定
+            const staticCards = {
+                hourTen: document.getElementById('hour-ten-static'),
+                hourOne: document.getElementById('hour-one-static'),
+                minTen: document.getElementById('min-ten-static'),
+                minOne: document.getElementById('min-one-static'),
+                secTen: document.getElementById('sec-ten-static'),
+                secOne: document.getElementById('sec-one-static')
+            };
+
+            const flipLayers = {
+                hourTen: document.getElementById('hour-ten-flip'),
+                hourOne: document.getElementById('hour-one-flip'),
+                minTen: document.getElementById('min-ten-flip'),
+                minOne: document.getElementById('min-one-flip'),
+                secTen: document.getElementById('sec-ten-flip'),
+                secOne: document.getElementById('sec-one-flip')
+            };
+
+            const upperDigits = {
+                hourTen: document.getElementById('hour-ten-upper'),
+                hourOne: document.getElementById('hour-one-upper'),
+                minTen: document.getElementById('min-ten-upper'),
+                minOne: document.getElementById('min-one-upper'),
+                secTen: document.getElementById('sec-ten-upper'),
+                secOne: document.getElementById('sec-one-upper')
+            };
+
+            const lowerDigits = {
+                hourTen: document.getElementById('hour-ten-lower'),
+                hourOne: document.getElementById('hour-one-lower'),
+                minTen: document.getElementById('min-ten-lower'),
+                minOne: document.getElementById('min-one-lower'),
+                secTen: document.getElementById('sec-ten-lower'),
+                secOne: document.getElementById('sec-one-lower')
+            };
+
+            const dividers = document.querySelectorAll('.flip-section-divider');
+
+            // 时间获取
+            function getTimeDigits() {
+                const now = new Date();
+                const hours = now.getHours();
+                const minutes = now.getMinutes();
+                const seconds = now.getSeconds();
+                return {
+                    hourTen: Math.floor(hours / 10),
+                    hourOne: hours % 10,
+                    minTen: Math.floor(minutes / 10),
+                    minOne: minutes % 10,
+                    secTen: Math.floor(seconds / 10),
+                    secOne: seconds % 10
+                };
+            }
+
+            let prevDigits = {
+                hourTen: -1, hourOne: -1,
+                minTen: -1, minOne: -1,
+                secTen: -1, secOne: -1
+            };
+
+            // 翻页更新
+            function updateClock(force = false) {
+                const digits = getTimeDigits();
+
+                Object.keys(digits).forEach(key => {
+                    const newVal = digits[key];
+                    const oldVal = prevDigits[key];
+                    if (newVal !== oldVal || force) {
+                        if (staticCards[key]) staticCards[key].innerText = newVal;
+
+                        if (upperDigits[key]) {
+                            upperDigits[key].innerText = (oldVal === -1 ? newVal : oldVal);
+                        }
+                        if (lowerDigits[key]) {
+                            lowerDigits[key].innerText = newVal;
+                        }
+
+                        const flipEl = flipLayers[key];
+                        if (flipEl) {
+                            flipEl.classList.remove('flipping');
+                            void flipEl.offsetWidth;
+                            flipEl.classList.add('flipping');
+
+                            const onAnimationEnd = (e) => {
+                                if (e.target === flipEl || e.target.classList.contains('flip-animation-layer')) {
+                                    flipEl.classList.remove('flipping');
+                                    flipEl.removeEventListener('animationend', onAnimationEnd);
+                                }
+                            };
+                            flipEl.addEventListener('animationend', onAnimationEnd, { once: true });
+                        }
+                    }
+                });
+
+                prevDigits = { ...digits };
+            }
+
+            // ---------- ★ 修复版：稳定缩放，只执行必要操作 ★ ----------
+            let isResizing = false; // 防抖标志
+            
+            function resizeClockToMax() {
+                // 防抖：避免高频重复调用
+                if (isResizing) return;
+                isResizing = true;
+                
+                // 使用requestAnimationFrame优化性能，避免布局抖动
+                requestAnimationFrame(() => {
+                    const vw = window.innerWidth;
+                    const vh = window.innerHeight;
+
+                    // 边距优化，更稳定的计算
+                    const maxWidth = vw * 0.92;  // 留8%边距
+                    const maxHeight = vh * 0.88; // 留12%边距，给底部标签
+
+                    // 保存当前字体，避免重复读取布局
+                    flipClock.style.fontSize = '16px';
+                    flipClock.style.width = 'auto';
+                    flipClock.style.height = 'auto';
+                    flipClock.style.padding = '0.5em 1em'; // 固定内边距，不再动态修改
+                    
+                    // 强制同步布局
+                    const clockWidth = flipClock.offsetWidth;
+                    const clockHeight = flipClock.offsetHeight;
+
+                    if (clockWidth > 0 && clockHeight > 0) {
+                        const scaleX = maxWidth / clockWidth;
+                        const scaleY = maxHeight / clockHeight;
+                        let scale = Math.min(scaleX, scaleY);
+                        
+                        // 限制缩放范围，避免极端值
+                        scale = Math.min(Math.max(scale, 0.8), 15);
+                        
+                        // 一次性设置字体大小
+                        flipClock.style.fontSize = (16 * scale) + 'px';
+                        
+                        // 冒号大小同步调整（只需设置一次）
+                        dividers.forEach(div => {
+                            div.style.fontSize = '1.2em';
+                        });
+                    }
+                    
+                    isResizing = false;
+                });
+            }
+
+            // ---------- 使用防抖优化resize事件 ----------
+            let resizeTimer;
+            window.addEventListener('resize', () => {
+                clearTimeout(resizeTimer);
+                resizeTimer = setTimeout(() => {
+                    resizeClockToMax();
+                }, 100); // 100ms防抖，避免频繁调用
+            });
+
+            // ---------- 初始化 ----------
+            updateClock(true);
+            
+            // 延迟一帧执行首次缩放，确保DOM完全就绪
+            requestAnimationFrame(() => {
+                resizeClockToMax();
+            });
+
+            // ---------- 每秒更新时钟（只更新时间，不缩放）----------
+            setInterval(() => {
+                updateClock(false);
+                // ⚠️ 移除所有额外的resizeClockToMax调用！
+                // 不再每3秒校准，也不再每秒校准
+            }, 1000);
+
+            // 清理定时器
+            window.addEventListener('beforeunload', function() {
+                clearInterval(timer);
+            });
+
+        })();
+    </script>
+</body>
+</html>
